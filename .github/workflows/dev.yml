@@ -6,6 +6,7 @@ on:
     branches:
       - master
       - second
+      - update-actions
 
 env:
   BUILD_TYPE: Release
