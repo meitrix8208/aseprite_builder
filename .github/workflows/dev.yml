@@ -36,7 +36,7 @@ jobs:
         echo "EOF" >> $GITHUB_OUTPUT
     - name: Load version from cache
       id: version_check
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.version_info.outputs.latest_tag }}.txt
         key: cached_version
@@ -47,12 +47,10 @@ jobs:
     - name: Create Release
       id: create_release
       if: steps.should_build.outputs.should_build
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.version_info.outputs.latest_tag }}
-        release_name: Release Aseprite ${{ steps.version_info.outputs.latest_tag }}
+        name: Release Aseprite ${{ steps.version_info.outputs.latest_tag }}
         body: |
           ${{ steps.version_info.outputs.version_info }}
         draft: true
@@ -70,7 +68,7 @@ jobs:
     steps:
       - name: (Windows) Install dependencies
         if: matrix.os == 'windows-latest'
-        uses: seanmiddleditch/gha-setup-ninja@v3
+        uses: seanmiddleditch/gha-setup-ninja@v5
       - name: (Windows) Remove OpenSLL from PATH
         if: matrix.os == 'windows-latest'
         shell: powershell
@@ -83,7 +81,7 @@ jobs:
         run: brew install ninja p7zip
       - name: Get Skia from cache
         id: skia-cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: skia
           key: skia-${{ matrix.os }}-cache
@@ -136,9 +134,7 @@ jobs:
         working-directory: aseprite/build/bin
         run: 7z -tzip a Aseprite-${{ needs.check-version.outputs.latest_tag }}-${{ runner.os }}.zip *
       - name: Upload release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: shogo82148/actions-upload-release-asset@v1
         with:
           upload_url: ${{ needs.check-version.outputs.upload_url }}
           asset_path: aseprite/build/bin/Aseprite-${{ needs.check-version.outputs.latest_tag }}-${{ runner.os }}.zip
