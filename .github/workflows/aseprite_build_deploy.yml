@@ -2,6 +2,11 @@ name: Build and deploy Aseprite
 
 on:
   workflow_dispatch:
+    inputs:
+      aseprite_version:
+        description: 'Versión de Aseprite a compilar (dejar vacío para usar la última)'
+        required: false
+        default: 'latest'
   push:
     branches:
       - master
@@ -12,13 +17,15 @@ env:
 
 jobs:
   check-version:
-    name: Check latest Aseprite release
+    name: Check Aseprite release version
     runs-on: ubuntu-latest
     outputs:
       download_url: ${{ steps.version_info.outputs.download_url }}
       latest_tag: ${{ steps.version_info.outputs.latest_tag }}
       should_build: ${{ steps.should_build.outputs.should_build }}
       upload_url: ${{ steps.create_release.outputs.upload_url }}
+      selected_tag: ${{ steps.determine_version.outputs.selected_tag }}
+      selected_download_url: ${{ steps.determine_version.outputs.selected_download_url }}
     steps:
     - name: Get latest version info
       id: version_info
@@ -34,16 +41,54 @@ jobs:
         echo "version_info<<EOF" >> $GITHUB_OUTPUT
         echo "$VERSION_INFO" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Determine version to build
+      id: determine_version
+      run: |
+        if [ "${{ github.event.inputs.aseprite_version }}" = "" ] || [ "${{ github.event.inputs.aseprite_version }}" = "latest" ]; then
+          # Si no se especifica versión o es "latest", usar la última
+          echo "selected_tag=${{ steps.version_info.outputs.latest_tag }}" >> $GITHUB_OUTPUT
+          echo "selected_download_url=${{ steps.version_info.outputs.download_url }}" >> $GITHUB_OUTPUT
+          echo "version_info=${{ steps.version_info.outputs.version_info }}" >> $GITHUB_OUTPUT
+        else
+          # Si se especifica una versión concreta, buscarla en las releases de Aseprite
+          REQUESTED_VERSION="${{ github.event.inputs.aseprite_version }}"
+          # Asegurar que tiene formato vX.X.X si solo se proporcionó X.X.X
+          if [[ ! "$REQUESTED_VERSION" == v* ]]; then
+            REQUESTED_VERSION="v${REQUESTED_VERSION}"
+          fi
+          
+          # Obtener información de la versión solicitada
+          data=$(curl -sL "https://api.github.com/repos/aseprite/aseprite/releases/tags/${REQUESTED_VERSION}")
+          TAG=$(echo "${data}" | jq -r '.tag_name')
+          
+          if [ "$TAG" = "null" ]; then
+            echo "Error: La versión ${REQUESTED_VERSION} no existe"
+            exit 1
+          fi
+          
+          DOWNLOAD_URL=$(echo "${data}" | jq -r '.assets[].browser_download_url')
+          VERSION_INFO=$(echo "${data}" | jq -r '.body')
+          
+          echo "selected_tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "selected_download_url=${DOWNLOAD_URL}" >> $GITHUB_OUTPUT
+          echo "version_info<<EOF" >> $GITHUB_OUTPUT
+          echo "$VERSION_INFO" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        fi
+    
     - name: Load version from cache
       id: version_check
       uses: actions/cache@v3
       with:
-        path: ${{ steps.version_info.outputs.latest_tag }}.txt
-        key: cached_version
+        path: ${{ steps.determine_version.outputs.selected_tag }}.txt
+        key: cached_version-${{ steps.determine_version.outputs.selected_tag }}
+    
     - name: Should we start new build?
       id: should_build
       if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/fix' || steps.version_check.outputs.cache-hit != 'true'
       run: echo "should_build=true" >> $GITHUB_OUTPUT
+    
     - name: Create Release
       id: create_release
       if: steps.should_build.outputs.should_build
@@ -51,10 +96,10 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.version_info.outputs.latest_tag }}
-        release_name: Release Aseprite ${{ steps.version_info.outputs.latest_tag }}
+        tag_name: ${{ steps.determine_version.outputs.selected_tag }}
+        release_name: Release Aseprite ${{ steps.determine_version.outputs.selected_tag }}
         body: |
-          ${{ steps.version_info.outputs.version_info }}
+          ${{ steps.determine_version.outputs.version_info }}
         draft: true
         prerelease: false
 
@@ -101,7 +146,7 @@ jobs:
           unzip Skia-${{ runner.os }}-Release-X64.zip -d skia
       - name: Download Aseprite release
         run: |
-          curl -o Aseprite-source.zip -L ${{ needs.check-version.outputs.download_url }}
+          curl -o Aseprite-source.zip -L ${{ needs.check-version.outputs.selected_download_url }}
           unzip Aseprite-source.zip -d aseprite
           mkdir -p aseprite/build
       - name: (Windows) Set architecture for the produced binary
@@ -136,13 +181,13 @@ jobs:
         run: echo '# This file is here so Aseprite behaves as a portable program' > aseprite.ini
       - name: Create release
         working-directory: aseprite/build/bin
-        run: 7z -tzip a Aseprite-${{ needs.check-version.outputs.latest_tag }}-${{ runner.os }}.zip *
+        run: 7z -tzip a Aseprite-${{ needs.check-version.outputs.selected_tag }}-${{ runner.os }}.zip *
       - name: Upload release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.check-version.outputs.upload_url }}
-          asset_path: aseprite/build/bin/Aseprite-${{ needs.check-version.outputs.latest_tag }}-${{ runner.os }}.zip
-          asset_name: Aseprite-${{ needs.check-version.outputs.latest_tag }}-${{ runner.os }}.zip
+          asset_path: aseprite/build/bin/Aseprite-${{ needs.check-version.outputs.selected_tag }}-${{ runner.os }}.zip
+          asset_name: Aseprite-${{ needs.check-version.outputs.selected_tag }}-${{ runner.os }}.zip
           asset_content_type: application/zip
