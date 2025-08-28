@@ -7,10 +7,6 @@ on:
         description: 'Versión de Aseprite a compilar'
         required: true
         default: ''
-  push:
-    branches:
-      - master
-      - fix
 
 env:
   BUILD_TYPE: Release
