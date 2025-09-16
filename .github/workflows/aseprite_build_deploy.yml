@@ -25,39 +25,39 @@ jobs:
       selected_download_url: ${{ steps.get_version.outputs.selected_download_url }}
       version_info: ${{ steps.get_version.outputs.version_info }}
     steps:
-    - name: Get version info
-      id: get_version
-      run: |
-        # Obtener la versión solicitada
-        REQUESTED_VERSION="${{ github.event.inputs.aseprite_version }}"
-        
-        if [[ "$REQUESTED_VERSION" == "latest" ]]; then
-          # Obtener la última release
-          data=$(curl -sL "https://api.github.com/repos/aseprite/aseprite/releases/latest")
-          TAG=$(echo "${data}" | jq -r '.tag_name')
-          VERSION_INFO=$(echo "${data}" | jq -r '.body')
-        else
-          # Asegurar que tiene formato vX.X.X si solo se proporcionó X.X.X
-          if [[ ! "$REQUESTED_VERSION" == v* ]]; then
-            REQUESTED_VERSION="v${REQUESTED_VERSION}"
+      - name: Get version info
+        id: get_version
+        run: |
+          # Obtener la versión solicitada
+          REQUESTED_VERSION="${{ github.event.inputs.aseprite_version }}"
+
+          if [[ "$REQUESTED_VERSION" == "latest" ]]; then
+            # Obtener la última release
+            data=$(curl -sL "https://api.github.com/repos/aseprite/aseprite/releases/latest")
+            TAG=$(echo "${data}" | jq -r '.tag_name')
+            VERSION_INFO=$(echo "${data}" | jq -r '.body')
+          else
+            # Asegurar que tiene formato vX.X.X si solo se proporcionó X.X.X
+            if [[ ! "$REQUESTED_VERSION" == v* ]]; then
+              REQUESTED_VERSION="v${REQUESTED_VERSION}"
+            fi
+            
+            # Obtener información de la versión solicitada
+            data=$(curl -sL "https://api.github.com/repos/aseprite/aseprite/releases/tags/${REQUESTED_VERSION}")
+            TAG=$(echo "${data}" | jq -r '.tag_name')
+            VERSION_INFO=$(echo "${data}" | jq -r '.body')
+            
+            if [ "$TAG" = "null" ]; then
+              echo "Error: La versión ${REQUESTED_VERSION} no existe"
+              exit 1
+            fi
           fi
-          
-          # Obtener información de la versión solicitada
-          data=$(curl -sL "https://api.github.com/repos/aseprite/aseprite/releases/tags/${REQUESTED_VERSION}")
-          TAG=$(echo "${data}" | jq -r '.tag_name')
-          VERSION_INFO=$(echo "${data}" | jq -r '.body')
-          
-          if [ "$TAG" = "null" ]; then
-            echo "Error: La versión ${REQUESTED_VERSION} no existe"
-            exit 1
-          fi
-        fi
-        
-        DOWNLOAD_URL=$(echo "${data}" | jq -r '.assets[].browser_download_url' | grep Source.zip)
-        
-        echo "selected_tag=${TAG}" >> $GITHUB_OUTPUT
-        echo "selected_download_url=${DOWNLOAD_URL}" >> $GITHUB_OUTPUT
-        echo "version_info=${VERSION_INFO}" >> $GITHUB_OUTPUT
+
+          DOWNLOAD_URL=$(echo "${data}" | jq -r '.assets[].browser_download_url' | grep Source.zip)
+
+          echo "selected_tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "selected_download_url=${DOWNLOAD_URL}" >> $GITHUB_OUTPUT
+          echo "version_info=${VERSION_INFO}" >> $GITHUB_OUTPUT
 
   build-aseprite:
     name: Build Aseprite
@@ -194,7 +194,7 @@ jobs:
           name: Aseprite ${{ needs.prepare-build.outputs.selected_tag }} Build
           body: |
             Custom build of Aseprite ${{ needs.prepare-build.outputs.selected_tag }}
-            
+
             ${{ needs.prepare-build.outputs.version_info }}
           artifacts: "artifacts/*/Aseprite-*.zip"
           draft: false
