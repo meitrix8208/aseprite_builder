@@ -11,7 +11,6 @@ on:
   push:
     branches:
       - master
-      - new-workflow
 
 env:
   BUILD_TYPE: Release
@@ -29,6 +28,9 @@ jobs:
         id: get_version
         run: |
           # Obtener la versión solicitada
+          if [ -z "${{ github.event.inputs.aseprite_version }}" ]; then
+            REQUESTED_VERSION="latest"
+          fi
           REQUESTED_VERSION="${{ github.event.inputs.aseprite_version }}"
 
           if [[ "$REQUESTED_VERSION" == "latest" ]]; then
@@ -55,9 +57,16 @@ jobs:
 
           DOWNLOAD_URL=$(echo "${data}" | jq -r '.assets[].browser_download_url' | grep Source.zip)
 
+          # Escapar caracteres especiales para GitHub Output
+          VERSION_INFO_ESCAPED=$(echo "$VERSION_INFO" | tr '\n' ' ' | tr -d '\r' | sed 's/"/\\"/g')
+
           echo "selected_tag=${TAG}" >> $GITHUB_OUTPUT
           echo "selected_download_url=${DOWNLOAD_URL}" >> $GITHUB_OUTPUT
-          echo "version_info=${VERSION_INFO}" >> $GITHUB_OUTPUT
+          {
+            echo "version_info<<EOF"
+            echo "$VERSION_INFO"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
   build-aseprite:
     name: Build Aseprite
@@ -65,8 +74,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # os: [windows-latest, ubuntu-latest, macOS-latest]
-        os: [windows-latesty]
+        os: [windows-latest, ubuntu-latest, macOS-latest]
       fail-fast: false
     steps:
       - name: (Windows) Install dependencies
@@ -127,7 +135,15 @@ jobs:
         if: matrix.os == 'windows-latest'
         working-directory: aseprite/build
         shell: pwsh
-        run: cmake -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_IGNORE_PATH='C:/ProgramData/chocolatey/bin/;C:/Strawberry/c/bin/' -DLAF_BACKEND=skia -DSKIA_DIR="$(Convert-Path ../../skia)" -DSKIA_LIBRARY_DIR="$(Convert-Path ../../skia/out/Release-x64)" -DSKIA_LIBRARY="$(Convert-Path ../../skia/out/Release-x64/skia.lib)" -G Ninja ..
+        run: |
+          cmake -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
+                -DCMAKE_IGNORE_PATH='C:/ProgramData/chocolatey/bin/;C:/Strawberry/c/bin/' `
+                -DLAF_BACKEND=skia `
+                -DSKIA_DIR="$(Convert-Path ../../skia)" `
+                -DSKIA_LIBRARY_DIR="$(Convert-Path ../../skia/out/Release-x64)" `
+                -DSKIA_LIBRARY="$(Convert-Path ../../skia/out/Release-x64/skia.lib)" `
+                -G Ninja ..
+
       - name: (Ubuntu) Run CMake
         if: matrix.os == 'ubuntu-latest'
         working-directory: aseprite/build
