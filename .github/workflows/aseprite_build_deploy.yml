@@ -28,9 +28,6 @@ jobs:
         id: get_version
         run: |
           # Obtener la versión solicitada
-          if [ -z "${{ github.event.inputs.aseprite_version }}" ]; then
-            REQUESTED_VERSION="latest"
-          fi
           REQUESTED_VERSION="${{ github.event.inputs.aseprite_version }}"
 
           if [[ "$REQUESTED_VERSION" == "latest" ]]; then
