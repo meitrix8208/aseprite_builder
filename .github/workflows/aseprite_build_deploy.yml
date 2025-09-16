@@ -30,6 +30,10 @@ jobs:
           # Obtener la versión solicitada
           REQUESTED_VERSION="${{ github.event.inputs.aseprite_version }}"
 
+          if [ -z "$REQUESTED_VERSION" ]; then
+            REQUESTED_VERSION="latest"
+          fi
+
           if [[ "$REQUESTED_VERSION" == "latest" ]]; then
             # Obtener la última release
             data=$(curl -sL "https://api.github.com/repos/aseprite/aseprite/releases/latest")
@@ -71,7 +75,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macOS-latest]
+        # os: [windows-latest, ubuntu-latest, macOS-latest]
+        os: [windows-latest]
       fail-fast: false
     steps:
       - name: (Windows) Install dependencies
@@ -210,7 +215,7 @@ jobs:
 
             ${{ needs.prepare-build.outputs.version_info }}
           artifacts: "artifacts/*/Aseprite-*.zip"
-          draft: false
+          draft: true
           prerelease: false
           allowUpdates: true
           token: ${{ secrets.GITHUB_TOKEN }}
