@@ -93,7 +93,7 @@ jobs:
 
       - name: (Ubuntu) Install dependencies
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt update && sudo apt install -y cmake ninja-build libxcursor-dev libxi-dev libgl1-mesa-dev libfontconfig-dev
+        run: sudo apt update && sudo apt install -y g++ clang cmake ninja-build libx11-dev libxcursor-dev libxi-dev libxrandr-dev libgl1-mesa-dev libfontconfig1-dev
 
       - name: (macOS) Install dependencies
         if: matrix.os == 'macOS-latest'
