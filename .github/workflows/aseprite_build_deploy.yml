@@ -75,8 +75,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # os: [windows-latest, ubuntu-latest, macOS-latest]
-        os: [windows-latest]
+        os: [windows-latest, ubuntu-latest, macOS-latest]
+        # os: [windows-latest]
       fail-fast: false
     steps:
       - name: (Windows) Install dependencies
@@ -101,7 +101,7 @@ jobs:
 
       - name: Get Skia from cache
         id: skia-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: skia
           key: skia-${{ matrix.os }}-m124-cache
@@ -188,7 +188,7 @@ jobs:
         run: 7z -tzip a Aseprite-${{ needs.prepare-build.outputs.selected_tag }}-${{ runner.os }}.zip *
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Aseprite-${{ needs.prepare-build.outputs.selected_tag }}-${{ runner.os }}
           path: aseprite/build/bin/Aseprite-${{ needs.prepare-build.outputs.selected_tag }}-${{ runner.os }}.zip
@@ -201,7 +201,7 @@ jobs:
     if: always() && needs.prepare-build.result == 'success'
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
